@@ -3,11 +3,13 @@ const Telegraf = require('telegraf');
 const token = process.env.BOT_API_KEY;
 const bot = new Telegraf(token);
 const apiai = require('apiai');
+const pollingFreq = 1000;
 
 let ai = apiai(process.env.APIAI_KEY);
 
 import CryptoPoller from './cryptoPoll';
-let cp = new CryptoPoller(1000);
+let cp = new CryptoPoller(pollingFreq);
+setInterval(checkReminders, pollingFreq);
 /**
 * @param {context} ctx
 */
@@ -35,22 +37,8 @@ function parseCommand(ctx, nameString) {
         console.log(response);
         if (response.result.action != 'input.unknown') {
           let params = response.result.parameters;
-          if (response.result.action === 'map_fiat_to_crypto') {
-            if (params.fiat == '') {
-              // assume SGD
-              ctx.reply(cp.getPriceString(params.crypto, 'SGD'));
-            } else {
-              ctx.reply(cp.getPriceString(params.crypto, params.fiat));
-            }
-          } else if (response.result.action === 'percent_reminder') {
-            let crypto = params.crypto;
-            let percent = parseInt(params.pcnt.replace('%', ''));
-            let mappedValue = cp.getWeekPercent(crypto, percent);
-            ctx.reply('The mapped value in last week\'s range is '
-              + mappedValue);
-          } else {
-            ctx.reply('Error with dialog parsing');
-          }
+          let action = response.result.action;
+           handleResponse(action, params, ctx);
         } else {
           ctx.reply('Error with dialog parsing');
         }
@@ -62,6 +50,78 @@ function parseCommand(ctx, nameString) {
     });
 
     request.end();
+  }
+}
+
+
+/**
+* @param {obj} action
+* @param {obj} params
+* @param {obj} ctx
+*/
+function handleResponse(action, params, ctx) {
+  switch (action) {
+    case 'map_fiat_to_crypto':
+      if (params.fiat == '') {
+        // assume SGD
+        ctx.reply(cp.getPriceString(params.crypto, 'SGD'));
+      } else {
+        ctx.reply(cp.getPriceString(params.crypto, params.fiat));
+      }
+      break;
+    case 'percent_reminder':
+      let crypto = params.crypto;
+      let percent = parseInt(params.pcnt.replace('%', ''));
+      let reminderType = null;
+      if (params.comp === 'lt') {
+        reminderType = 'PERCENTAGE_LT';
+      } else if (params.comp === 'gt') {
+        reminderType = 'PERCENTAGE_GT';
+      }
+      let reminderTo = ctx.message.chat.id;
+      let success = cp.getWeekPercent(crypto,
+        percent, reminderType, reminderTo);
+      if (success) {
+        ctx.reply('got it!');
+      } else {
+        ctx.reply('reminder failed! please remember to enter '
+         + 'currency, gt or lt, and percent with the %');
+      }
+
+      break;
+    default:
+      ctx.reply('Error with dialog parsing');
+  }
+}
+
+/**
+*/
+function checkReminders() {
+  let listOfSubs = cp.checkReminders();
+  // console.log('subs', listOfSubs);
+  for (let i=0; i < listOfSubs.length; i++) {
+    let sub = listOfSubs[i];
+    // console.log(sub);
+    /*
+      currentPrice: globalPrices[subscriber.currency].USD,
+      type: subscriber.type,
+      chatId: subscriber.chatId,
+      value: subscriber.value,
+      currency: subscriber.currency,
+    */
+    let replyText = 'REMINDER: \n';
+    replyText += sub.currency + ' is ';
+    switch (sub.type) {
+      case 'PERCENTAGE_LT':
+        replyText += 'lower than the weeks\' ';
+        break;
+      case 'PERCENTAGE_GT':
+        replyText += 'higher than the weeks\' ';
+        break;
+    }
+    replyText += sub.pcnt + '%!\n';
+    replyText += '(dev notes: s-' + sub.value + 'c-' + sub.currentPrice + ' )';
+    bot.telegram.sendMessage(sub.chatId, replyText);
   }
 }
 /* ai request response
