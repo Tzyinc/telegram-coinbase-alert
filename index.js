@@ -14,12 +14,17 @@ setInterval(checkReminders, pollingFreq);
 * @param {context} ctx
 */
 bot.start((ctx) => {
-  console.log('started:', ctx.from.id);
+  // console.log('started:', ctx.from.id);
   return ctx.reply('Welcome!');
 });
 
 bot.mention('@tencoinbot', (ctx) => parseCommand(ctx, '@tencoinbot'));
 bot.hears(/@bot/, (ctx) => parseCommand(ctx, '@bot'));
+bot.on('text', (ctx) => {
+  if (ctx.message.chat.type === 'private') {
+    parseCommand(ctx, '');
+  }
+});
 
 /**
 * @param {context} ctx
@@ -34,7 +39,7 @@ function parseCommand(ctx, nameString) {
     });
 
     request.on('response', function(response) {
-        console.log(response);
+        // console.log(response);
         if (response.result.action != 'input.unknown') {
           let params = response.result.parameters;
           let action = response.result.action;
@@ -43,9 +48,8 @@ function parseCommand(ctx, nameString) {
           ctx.reply('Error with dialog parsing');
         }
     });
-
     request.on('error', function(error) {
-        console.log(error);
+        console.error(error);
         ctx.reply('Error with dialog parsing');
     });
 
