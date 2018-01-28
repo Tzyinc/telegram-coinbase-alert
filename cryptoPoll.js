@@ -43,32 +43,36 @@ export default class CryptoPoller {
   /**
   */
   pollPrices() {
-    cc.priceMulti(['BTC', 'ETH', 'LTC'], ['USD', 'SGD'])
-    .then((prices) => {
-      let date = new Date();
-      let dateInt = date.getTime();
-      coin.insert({
-        coin: 'LTC',
-        date: dateInt,
-        USD: prices.LTC.USD,
-        SGD: prices.LTC.SGD,
-      });
-      coin.insert({
-        coin: 'BTC',
-        date: dateInt,
-        USD: prices.BTC.USD,
-        SGD: prices.BTC.SGD,
-      });
-      coin.insert({
-        coin: 'ETH',
-        date: dateInt,
-        USD: prices.ETH.USD,
-        SGD: prices.ETH.SGD,
-      });
-      globalPrices = prices;
-    // -> { BTC: { USD: 1114.63, EUR: 1055.82 },
-    //      ETH: { USD: 12.74, EUR: 12.06 } }
-    }).catch(console.error);
+    try {
+      cc.priceMulti(['BTC', 'ETH', 'LTC'], ['USD', 'SGD'])
+      .then((prices) => {
+        let date = new Date();
+        let dateInt = date.getTime();
+        coin.insert({
+          coin: 'LTC',
+          date: dateInt,
+          USD: prices.LTC.USD,
+          SGD: prices.LTC.SGD,
+        });
+        coin.insert({
+          coin: 'BTC',
+          date: dateInt,
+          USD: prices.BTC.USD,
+          SGD: prices.BTC.SGD,
+        });
+        coin.insert({
+          coin: 'ETH',
+          date: dateInt,
+          USD: prices.ETH.USD,
+          SGD: prices.ETH.SGD,
+        });
+        globalPrices = prices;
+      // -> { BTC: { USD: 1114.63, EUR: 1055.82 },
+      //      ETH: { USD: 12.74, EUR: 12.06 } }
+      }).catch(console.error);
+    } catch (err) {
+      console.error(err);
+    }
   }
 
   /**
