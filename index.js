@@ -14,7 +14,6 @@ setInterval(checkReminders, pollingFreq);
 * @param {context} ctx
 */
 bot.start((ctx) => {
-  // console.log('started:', ctx.from.id);
   return ctx.reply('Welcome!');
 });
 
@@ -39,7 +38,6 @@ function parseCommand(ctx, nameString) {
     });
 
     request.on('response', function(response) {
-        // console.log(response);
         if (response.result.action != 'input.unknown') {
           let params = response.result.parameters;
           let action = response.result.action;
@@ -82,15 +80,9 @@ function handleResponse(action, params, ctx) {
       } else if (params.comp === 'gt') {
         reminderType = 'PERCENTAGE_GT';
       }
+      console.log(reminderType);
       let reminderTo = ctx.message.chat.id;
-      let success = cp.getWeekPercent(crypto,
-        percent, reminderType, reminderTo);
-      if (success) {
-        ctx.reply('got it!');
-      } else {
-        ctx.reply('reminder failed! please remember to enter '
-         + 'currency, gt or lt, and percent with the %');
-      }
+      cp.getWeekPercent(ctx, crypto, percent, reminderType, reminderTo);
 
       break;
     default:
@@ -102,10 +94,8 @@ function handleResponse(action, params, ctx) {
 */
 function checkReminders() {
   let listOfSubs = cp.checkReminders();
-  // console.log('subs', listOfSubs);
   for (let i=0; i < listOfSubs.length; i++) {
     let sub = listOfSubs[i];
-    // console.log(sub);
     /*
       currentPrice: globalPrices[subscriber.currency].USD,
       type: subscriber.type,

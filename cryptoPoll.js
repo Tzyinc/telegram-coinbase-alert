@@ -4,7 +4,6 @@ const cc = require('cryptocompare');
 const loki = require('lokijs');
 const WEEK_MILLI = 604800000;
 
-// console.log(coin.length);
 let coin = null;
 let subs = null;
 let db = null;
@@ -28,7 +27,6 @@ export default class CryptoPoller {
     */
     function databaseInitialize() {
       coin = db.getCollection('coin');
-      // console.log(coin.length);
       subs = db.getCollection('subs');
 
       if (coin === null) {
@@ -85,15 +83,14 @@ export default class CryptoPoller {
       type: 'PERCENTAGE_LT',
     });
 
-    // console.log('ltsubs in check', ltSubscribers);
     if ((ltSubscribers != []) && (globalPrices!=null)) {
       ltSubscribers = ltSubscribers.filter((subscriber) => {
-        return globalPrices[subscriber.currency].USD <= subscriber.value;
+        return globalPrices[subscriber.currency].SGD <= subscriber.value;
       });
       toRemove = toRemove.concat(ltSubscribers);
       ltSubscribers = ltSubscribers.map((subscriber) => {
         return {
-        currentPrice: globalPrices[subscriber.currency].USD,
+        currentPrice: globalPrices[subscriber.currency].SGD,
         type: subscriber.type,
         chatId: subscriber.chatId,
         value: subscriber.value,
@@ -107,15 +104,14 @@ export default class CryptoPoller {
       type: 'PERCENTAGE_GT',
     });
 
-    // console.log('gtsubs in check', gtSubscribers);
     if ((gtSubscribers != []) && (globalPrices!=null)) {
       gtSubscribers = gtSubscribers.filter((subscriber) => {
-        return globalPrices[subscriber.currency].USD >= subscriber.value;
+        return globalPrices[subscriber.currency].SGD >= subscriber.value;
       });
       toRemove = toRemove.concat(gtSubscribers);
       gtSubscribers = gtSubscribers.map((subscriber) => {
         return {
-          currentPrice: globalPrices[subscriber.currency].USD,
+          currentPrice: globalPrices[subscriber.currency].SGD,
           type: subscriber.type,
           chatId: subscriber.chatId,
           value: subscriber.value,
@@ -146,45 +142,52 @@ export default class CryptoPoller {
   }
 
   /**
+  * @param {contenxt} ctx
   * @param {string} crypto
   * @param {number} percent
   * @param {string} reminderType
   * @param {string} reminderTo
-  * @return {number} current percentage
   */
-  getWeekPercent(crypto, percent, reminderType, reminderTo) {
+  getWeekPercent(ctx, crypto, percent, reminderType, reminderTo) {
     if (globalPrices != null && globalPrices[crypto] != null) {
-      let date = new Date();
-      const dateInt = date.getTime();
-      const weekAgo = dateInt - WEEK_MILLI;
-      let results = coin.find({
-        coin: crypto,
-        date: {'$between': [weekAgo, dateInt]},
+      cc.histoDay(crypto, 'SGD', {limit: 7}).then((prices) => {
+        const max = prices.reduce((prev, current) => {
+          if (current != null) {
+            return (prev.high > current.high) ? prev : current;
+          } else {
+            return prev;
+          }
+        });
+        const min = prices.reduce((prev, current) => {
+          if (current != null) {
+            return (prev.low < current.low) ? prev : current;
+          } else {
+            return prev;
+          }
+        });
+
+        let comparatorValue = mapValues(percent, min.low, max.high);
+        let query = {
+          value: comparatorValue,
+          currency: crypto,
+          pcnt: percent,
+        };
+        addReminder(subs, reminderType, reminderTo, query)
+        .then(
+          (result) => {
+          if (result) {
+            ctx.reply('got it!');
+          } else {
+            ctx.reply('reminder failed! please remember to enter '
+             + 'currency, gt or lt, and percent with the %');
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          ctx.reply('reminder failed! please remember to enter '
+           + 'currency, gt or lt, and percent with the %');
+        });
       });
-      const max = results.reduce((prev, current) => {
-        if (current != null) {
-          return (prev.USD > current.USD) ? prev : current;
-        } else {
-          return prev;
-        }
-      });
-      const min = results.reduce((prev, current) => {
-        if (current != null) {
-          return (prev.USD < current.USD) ? prev : current;
-        } else {
-          return prev;
-        }
-      });
-      // console.log('max min is', max, min);
-      let comparatorValue = mapValues(percent, min.USD, max.USD);
-      let query = {
-        value: comparatorValue,
-        currency: crypto,
-        pcnt: percent,
-      };
-      return addReminder(subs, reminderType, reminderTo, query);
-    } else {
-      return null;
     }
   }
 }
